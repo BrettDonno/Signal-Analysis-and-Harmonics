@@ -1,0 +1,67 @@
+ <!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title> Fourier Analysis</title>
+        <!--  Added Libs -->
+        <!--  Using CDN for external libs-->
+        <script src = "https://cdn.plot.ly/plotly-2.14.0.min.js"></script>
+        <script src = "plotHelper.js"></script>
+        <script src = "FourierSeriesAnalysis.js"></script>
+    </head>
+        <!--  Stylesheet for setting up page-->
+        <link rel="stylesheet" type="text/css" href="PlotLayout.css">
+        
+        
+    <body onload = 'intiliseEmptyPlots(); initilise_table()'>
+         
+    <header> <b>Introduction to harmonics - Fourier Series </b></header>
+        <p>
+        Any perodic signal can be represented by a series of sinusodial signals consisting of, 1) a fundamental component, the frequency with the highest amplitied called the fundamental frequency and 2) various harmonic components with magnitude, frequency and phase. <br>
+        Note the fundamental frequency is the desired frequency to be generated (e.g. generators spinning at 50 Hz) while the harmonics are unintended components. 
+        </p>
+
+
+
+        <div>
+
+            <div class ="row" style = "padding-left: 40px"> 
+                <table id="X_range_table" ,="">
+                    <tbody><tr>  <th></th>  <th>Xstart</th> <th>Xstep</th> <th>Xstop</th> </tr>
+                        <tr> 
+                            <td><b>Xrange</b></td>
+                            <td><input type="number" id="X_range_start" style="height: 50px; width: 100px;" value="0.00"> </td> 
+                            <td><input type="number" id="X_range_step" style="height: 50px; width: 100px;" value="0.0001"></td> 
+                            <td><input type="number" id="X_range_end" style="height: 50px; width: 100px;" value="0.04"></td></tds>  
+                        </tr>
+                    </tbody>
+                </table>
+                <!-- <div class ="column"> 
+                    <label><p> <b>Xrange </b>     X start:      X step:    X stop</p></label>
+                   
+                    
+                   
+                    
+                </div>
+            </div> -->
+      </div>
+    <!--Create somewhere to draw the plots -->
+    <div class = "column sideBarTable",>
+            <table id = 'tableDataDisplay' , class = 'scrollTable'>
+             </table>
+    </div>
+
+    <div class = "column">
+        <div class = "row">
+            <div id="Single_Waveforms"></div>
+            <div id="Combined_Waveform"></div>
+            <div id="Frequency_Plot"></div>
+        </div>
+    </div>
+
+
+    <header> <b> Filtering with RLC filter</b></header>
+
+    </div>
+    </body>
+</html> 
