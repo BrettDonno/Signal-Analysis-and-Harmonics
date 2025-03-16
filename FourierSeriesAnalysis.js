@@ -1,94 +1,138 @@
+// To do :
+//      1) Remove the signal from the freq table. Instead store the data in the plot.
+//      2) change the update plot script to accept a type of update, e.g. add plot, remove plot or recalc plot
 'use strict';
+
+// math.config({
+//     number: 'BigNumber',      // Default type of number:
+//                               // 'number' (default), 'BigNumber', or 'Fraction'
+//     precision: 64,            // Number of significant digits for BigNumbers
+//     relTol: 1e-60,
+//     absTol: 1e-63
+//   })
 
 const TABLE_HEADERS = ['Name','Delete','Frequency','Magnitude','Phase']
     
 const CELL_STYLE = 'tabCell'
 const HEAD_STYLE = 'tblHead'
 
+
+// const Calculate_harmonic_signal = (x_range, magnitude, frequency, phase) => () => x_range.map( x=> magnitude * Math.sin(2*Math.PI*frequency*x + phase*Math.PI/180));
 function initilise_table(){
-
-    let FREQ_TABLE = [
-        // {'Delete': Button or none for first,'Frequency': Input box,'Magnitude': Input box,'Phase':Input box,  'Name':}
-        ]        
-    const TABLE_DIV = document.getElementById('tableDataDisplay')
-    // ID of the xranges
-    const X_RANGE_FIELDS = {
-        'Start' : document.getElementById('X_range_start'),
-        'Step'  : document.getElementById('X_range_step'),
-        'Stop'  : document.getElementById('X_range_end'),
+    //Package information to reduce passing
+    let TABLE_INFO = {
+            FREQ_TABLE: [
+                // {'Delete': Button or none for first,'Frequency': Input box,'Magnitude': Input box,'PhaseIn':put box,  'Name':, 'signal':}
+                ],
+          TABLE_DIV: document.getElementById('tableDataDisplay'),
+            // ID of the xranges
+                X_RANGE_FIELDS:  {
+                    'Start' : document.getElementById('X_range_start'),
+                    'Step'  : document.getElementById('X_range_step'),
+                    'Stop'  : document.getElementById('X_range_end'),
+                },
+                X_RANGE: [],
     }
+
+    TABLE_INFO['X_RANGE'] = get_Xrange_from_Fields(TABLE_INFO['X_RANGE_FIELDS']) 
     
-    createTablehead(TABLE_DIV,TABLE_HEADERS , HEAD_STYLE)
+    createTablehead(TABLE_INFO['TABLE_DIV'],TABLE_HEADERS , HEAD_STYLE)
 
-    add_ToFreq_Table(FREQ_TABLE,TABLE_HEADERS, 'Fundamental',TABLE_DIV)
-    add_blur_listener_to_inputs(FREQ_TABLE[0], FREQ_TABLE, get_Xrange_from_Fields(X_RANGE_FIELDS))
-    FREQ_TABLE[0].Frequency.defaultValue = 50
-    FREQ_TABLE[0].Magnitude.defaultValue = 1
-    FREQ_TABLE[0].Phase.defaultValue = 0
+    add_ToFreq_Table(TABLE_INFO,TABLE_HEADERS, 'Fundamental')
+    add_blur_listener_to_inputs(TABLE_INFO['FREQ_TABLE'][0], TABLE_INFO)
+    TABLE_INFO['FREQ_TABLE'][0].Frequency.defaultValue = 50
+    TABLE_INFO['FREQ_TABLE'][0].Magnitude.defaultValue = 1
+    TABLE_INFO['FREQ_TABLE'][0].Phase.defaultValue = 0
+    TABLE_INFO['FREQ_TABLE'][0]['Signal'] = Calculate_harmonic_signal(TABLE_INFO["X_RANGE"], TABLE_INFO['FREQ_TABLE'][0]['Magnitude'].value, TABLE_INFO['FREQ_TABLE'][0]['Frequency'].value, TABLE_INFO['FREQ_TABLE'][0]['Phase'].value)
 
+    updatePlots(TABLE_INFO)
+    add_tables_event_listeners(TABLE_INFO)
 
-    let xrange = get_Xrange_from_Fields(X_RANGE_FIELDS) 
-    
-    updatePlots(FREQ_TABLE, xrange)
-    add_tables_event_listeners(FREQ_TABLE,TABLE_DIV, xrange)
-
-    add_xRange_listeners(FREQ_TABLE, X_RANGE_FIELDS)
+    add_xRange_listeners(TABLE_INFO) 
 }
 
-function add_xRange_listeners(freq_table, xrange_fields){
+/////////////////////////////////////////////////
+///// Listeners for the Xrange fields     ///////
+////////////////////////////////////////////////
 
-    for (let eachXfield in xrange_fields){
-        xrange_fields[eachXfield].addEventListener('blur', event => {updatePlots(freq_table,get_Xrange_from_Fields(xrange_fields))} )   
-        xrange_fields[eachXfield].addEventListener('keydown', event => { event.key === "Enter" ? updatePlots(freq_table,get_Xrange_from_Fields(xrange_fields)) : null} )   
+function add_xRange_listeners(table_info){
+    let xrange_dict = table_info['X_RANGE_FIELDS']
+
+    for (let eachXfield in xrange_dict){
+        xrange_dict[eachXfield].addEventListener('blur', event => {
+            Update_harmonic_signal(table_info)
+            updatePlots(table_info)
+        } )   
+        xrange_dict[eachXfield].addEventListener('keydown', event => { 
+            if (event.key === "Enter") {
+                Update_harmonic_signal(table_info)
+                updatePlots(table_info )
+            }
+        } )   
     }
     
 }
+
 
 function get_Xrange_from_Fields(xrange_fields){
-    let value_dict = {
-        'Start' : 0,
-        'Step'  : 0.0001,
-        'Stop'  : 0.04,
-    }
     
-    for (let each_key in xrange_fields){
-        value_dict[each_key] = parseFloat( xrange_fields[each_key].value);
-    }
-    
-    return value_dict
+    return create_range(  parseFloat( xrange_fields['Start'].value),  // It this necessary?
+                            parseFloat( xrange_fields['Stop'].value),
+                            parseFloat( xrange_fields['Step'].value)
+                            )
 }
+////////////////////////////////////////////////
+///// Listeners for the table fields     ///////
+////////////////////////////////////////////////
+function add_tables_event_listeners(table_info){
 
-function add_tables_event_listeners(freq_table, tableDiv, Xrange_fields){
+    let tableDiv = table_info['TABLE_DIV']
+
+    let freqTable = table_info['FREQ_TABLE']
 
     //dellete button and add new table
     tableDiv.addEventListener('click',(event)=>{ 
-        process_Table_Button(event, freq_table, tableDiv, Xrange_fields)
+        process_Table_Button(event, table_info)
     });
 
     //updating field and plot data
 
     tableDiv.addEventListener('keydown', event =>{
         if (event.key ==="Enter" && event.target.nodeName == "INPUT"){
-             updatePlots(freq_table,Xrange_fields)
+            let rowFields = [
+                            get_index_match_tableRow_dict(event.target, 'Frequency',freqTable),
+                            get_index_match_tableRow_dict(event.target, 'Magnitude',freqTable),
+                            get_index_match_tableRow_dict(event.target, 'Phase'    ,freqTable),    
+                            ].filter(x => x != -1) // e.g. index is found       
+            
+            calc_and_update(freqTable[rowFields], table_info)
+            updatePlots(table_info)
     }})   
 }
 
-function add_blur_listener_to_inputs(rowFields, freq_table, Xrange_fields){
-
-    rowFields['Frequency'].addEventListener('blur', event => {updatePlots(freq_table,(Xrange_fields))} )    
-    rowFields['Magnitude'].addEventListener('blur', event => {updatePlots(freq_table,Xrange_fields)} )    
-    rowFields['Phase']    .addEventListener('blur', event => {updatePlots(freq_table,Xrange_fields)} )        
+function add_blur_listener_to_inputs(rowFields, table_info){
+    rowFields['Frequency'].addEventListener('blur', event => {calc_and_update(rowFields, table_info)} )    
+    rowFields['Magnitude'].addEventListener('blur', event => {calc_and_update(rowFields, table_info)} )    
+    rowFields['Phase']    .addEventListener('blur', event => {calc_and_update(rowFields, table_info)} )        
 }
 
-function process_Table_Button(event, freq_table, tableDiv,Xrange_fields){
+function calc_and_update(rowFields, table_info){
+    rowFields['Signal'] = Calculate_harmonic_signal(table_info["X_RANGE"], rowFields['Magnitude'].value, rowFields['Frequency'].value, rowFields['Phase'].value)
+    updatePlots(table_info)
+}
+
+function process_Table_Button(event, table_info){
+    let freq_table    = table_info['FREQ_TABLE']
+
+    let tableDiv  = table_info['TABLE_DIV']
 
     if (event.target.nodeName === 'BUTTON'){
         if(event.target.id === 'table_div_new_row_button_manual'){
             let newRowName = prompt("Enter a name for the frequency")
-            let newFreq_Row = newRowName != null ? add_ToFreq_Table(freq_table, TABLE_HEADERS,newRowName, tableDiv) : null
+            let newFreq_Row = newRowName != null ? add_ToFreq_Table(table_info, TABLE_HEADERS,newRowName) : null
             
             if (newFreq_Row != null)
-                add_blur_listener_to_inputs(newFreq_Row, freq_table, Xrange_fields)
+                add_blur_listener_to_inputs(newFreq_Row, table_info)
         }
         else if(event.target.id == 'table_div_new_row_button_harmonic'){
             // let currentFreq =  freq_table.map( e=> { return parseFloat(e['Frequency'].value)})
@@ -105,72 +149,82 @@ function process_Table_Button(event, freq_table, tableDiv,Xrange_fields){
             let newHarmonic = currentHarmonics[0] + currentHarmonics[ currentHarmonics.length -1 ]
 
             let new_harmonic_name = formatOrdinals(Math.round(newHarmonic/currentHarmonics[0])).concat(" ", " Harmonic")
-            let newFreq_Row = add_ToFreq_Table(freq_table, TABLE_HEADERS,new_harmonic_name, tableDiv)
+            let newFreq_Row = add_ToFreq_Table(table_info, TABLE_HEADERS,new_harmonic_name)
             newFreq_Row['Frequency'].value = newHarmonic
 
-            add_blur_listener_to_inputs(newFreq_Row, freq_table, Xrange_fields)
+            add_blur_listener_to_inputs(newFreq_Row,table_info)
         }
         else{
         let delete_rowKey = get_index_match_tableRow_dict(event.target, 'Delete',freq_table)
         
         freq_table.splice(delete_rowKey,1)
-        update_table(tableDiv,  TABLE_HEADERS, HEAD_STYLE, freq_table, CELL_STYLE)
-        updatePlots(freq_table,Xrange_fields)
+        updated_displayed_table(tableDiv, freq_table,  TABLE_HEADERS, HEAD_STYLE, CELL_STYLE)
+        updatePlots(table_info)
         }
-
       return
     }
     
 }
 
-// we don't care about inprecise results
-function define_x_range(start,stop,step){
-    let results = [start];
-    let current_step = start;
-    
-    while (current_step < stop){
-        current_step = current_step + step;
-        results.push(current_step)
-    }
-    return results
-}
 
-
-//single function X_RANGE.map(x=> Math.sin(x))
-function updatePlots(freq_table, xrange_dict){
-    let x_range = define_x_range(xrange_dict['Start'],  xrange_dict['Stop'], xrange_dict['Step'])
+////////////////////////////////////////////////
+//          Update commands for listener     //
+function updatePlots(table_info){ 
+    let freq_table = table_info['FREQ_TABLE']
+    let x_range = table_info['X_RANGE'].toArray()
+    let upperFreqValue = freq_table.at(-1)['Frequency'].value * 5
     
-    function elementwise_sum(a,b){
-        return a.map((e,i) => e+b[i])
-    }
     
    //Calculating the elements
-    let plot_table_values = []
+    let plot_table_values = Array(freq_table.length)
     let Combined_Signal = Array(x_range.length).fill(0)
 
     for (let each_row_table in freq_table ){
-        let magnitude = freq_table[each_row_table].Magnitude.value
-        let frequency = freq_table[each_row_table].Frequency.value
-        let phase = freq_table[each_row_table].Phase.value
-
-        let row_y_vals = x_range.map( x=> magnitude * Math.sin(2*Math.PI*frequency*x - phase*Math.PI/180))
-        
+        let eachRowSignal = freq_table[each_row_table]['Signal']()
         // Single waveform
-        plot_table_values.push( {x:x_range,  y:row_y_vals, name: freq_table[each_row_table].Name} ) /// This will be slow. Need to store the lists in JS andf only update them when neede
-
+        plot_table_values[each_row_table] =  {x:x_range,  y:eachRowSignal.toArray(), name: freq_table[each_row_table].Name} 
         //combined waveform
-        Combined_Signal = elementwise_sum(Combined_Signal, row_y_vals)
+        Combined_Signal = math.add(Combined_Signal, eachRowSignal)
     }
 
+    // FFT waveform
+    // let [freq, y_fft] = runFFT(x_range, Combined_Signal,'Cooley_Turkey')
+    let [freq, y_fft] = runFFT(x_range, Combined_Signal,'Full')
+    
+    // console.log(math.abs(y_fft).toArray())
     // 'Single_Waveforms'
     Plotly.react( 'Single_Waveforms', plot_table_values, {title: 'Single Waveform'} );
 
     // 'Combined_Waveform' using the values in plot_table_value
-    Plotly.react( 'Combined_Waveform', [{x:x_range,  y:Combined_Signal}], {title: 'Combined Waveform'}  );
-
-    
+    Plotly.react( 'Combined_Waveform', [{x:x_range,  y:Combined_Signal.toArray()}], {title: 'Combined Waveform'}  );
     
     // 'Frequency_Plot'
+    // Plotly.react( 'Frequency_Plot', [{x:freq.toArray(),  y: math.abs(y_fft).toArray()}], {title: 'Combined Waveform'}  );
+    Plotly.react( 'Frequency_Plot', [{x:freq.toArray(),  y: math.abs(y_fft)}], {title: 'FFT', xaxis :{range:[0, upperFreqValue] }}  );
+    
+}
+
+function Update_harmonic_signal(table_info){
+
+    let xrange_dict = table_info['X_RANGE_FIELDS']
+    let freq_table = table_info['FREQ_TABLE']
+
+    let x_range = get_Xrange_from_Fields(xrange_dict)
+    
+    for (let each_row_table in freq_table ){
+       
+        freq_table[each_row_table]['Signal'] = Calculate_harmonic_signal(
+                                                                            x_range, 
+                                                                            freq_table[each_row_table].Magnitude.value,
+                                                                            freq_table[each_row_table].Frequency.value, 
+                                                                            freq_table[each_row_table].Phase.value 
+                                                                        )
+    }
+
+    table_info['X_RANGE'] = x_range
+
+    return true
+    
 }
 
 
@@ -196,30 +250,27 @@ function add_newRow_Button(tableDiv){
 //find which row in our table has a preoprty value match to, e.g. [ {'property':val, 'property2':val2, ..}]  => which value matches ElementMatch.
 // This is used to identify what row had the delete button pressed
 function get_index_match_tableRow_dict(elementMatch, key_match, table_tested){
-    for (let rowNum in table_tested){
-        if( table_tested[rowNum][key_match] ==elementMatch)
-            return rowNum
-    }
+    return table_tested.findIndex( e => e[key_match] == elementMatch)
 }
 
+function updated_displayed_table(tabDiv,freq_table, rowHeader,headStyle,cellStyle){
 
-
-function update_table(tabDiv,rowHeader,headStyle,freq_table,cellStyle){
-
-    let freq_table_array = []
+    let freq_table_array = Array(freq_table.length)
     for (let eachRow in freq_table){
-        let formated_table = TABLE_HEADERS.map(element =>{
-                return freq_table[eachRow][element]
-        })
-        freq_table_array.push(formated_table) 
+        let formated_table = TABLE_HEADERS.map(element => freq_table[eachRow][element] )
+        freq_table_array[eachRow] = (formated_table) 
     }
     
     createTable(tabDiv, rowHeader, headStyle, freq_table_array, cellStyle )
-    add_newRow_Button(tabDiv,freq_table )
+    add_newRow_Button(tabDiv )
 
 }
 
-function add_ToFreq_Table(freq_table,table_headers,row_name, tableDiv) { 
+function add_ToFreq_Table(table_info,table_headers,row_name) { 
+
+    let tableDiv = table_info['TABLE_DIV']
+    let freq_table = table_info['FREQ_TABLE']
+    let x_range = table_info['X_RANGE']
     
     let newFreqRow = {}
     let table_number_Inputs = table_headers.filter( X => (X!=="Name") & (X!=="Delete"))
@@ -248,14 +299,13 @@ function add_ToFreq_Table(freq_table,table_headers,row_name, tableDiv) {
         delete_Butt.textContent = "Delete";
         newFreqRow['Delete'] = delete_Butt
     }
-        
-    // Manually set the name
     newFreqRow['Name'] = row_name
-    
-    freq_table.push(newFreqRow)
-    // appendTable(tableDiv, formated_table,CELL_STYLE)
 
-    update_table(tableDiv,  table_headers, HEAD_STYLE, freq_table, CELL_STYLE)
+
+    newFreqRow['Signal'] = Calculate_harmonic_signal(x_range, newFreqRow['Magnitude'].value, newFreqRow['Frequency'].value, newFreqRow['Phase'].value)
+    freq_table.push(newFreqRow)
+
+    updated_displayed_table(tableDiv,freq_table, table_headers, HEAD_STYLE, CELL_STYLE)
     return newFreqRow
     
 }
@@ -277,4 +327,123 @@ function formatOrdinals(n){
     const suffix = suffixes.get(rule);
     return `${n}${suffix}`;
 
+}
+
+/////////// Calculation functions
+const Calculate_harmonic_signal = (x_range, magnitude, frequency, phase) => () => x_range.map( x=> magnitude * Math.sin(2*Math.PI*frequency*x + phase*Math.PI/180));
+
+
+function create_range(start,stop,step){
+    return math.range(start,stop,step)
+}
+// Defininging Range. Note it is based on floating point steps but we don't care about inprecise results
+    // NOTE: must be number  
+// function create_range(start,stop,step){
+//     // if (step == 0) 
+//     //     return []
+
+//     // let results = [start];
+//     // let current_step = start;
+    
+//     // while (current_step < stop){
+//     //     current_step = current_step + step;
+//     //     results.push(current_step)
+//     // }
+//     // return results
+// }
+
+// cooley-turkey
+
+// Explination for function: https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm
+    // Ignore the s nomenclature, it seems to me to be related to the how arrays are stored in memory and might be related to multi dimensional processing. 
+    // E.g.  s=2 if your data is in array of array [[x1,y1],[x2,y2],[x3,y3]]. Extending this to a 3rd variable z1,z2,z3 in the inner arrays has s=3
+
+function FFT_cooley_turkey(yval){
+    let N = yval.length
+    if(N == 0) return []
+    
+    if(N==1) return yval
+    // zero indexed so technically even are the odd indicies.
+    let Odd  = FFT_cooley_turkey(math.filter(yval,(e,i) => i%2 == 0))  // p = x_k
+    let Even = FFT_cooley_turkey(math.filter(yval,(e,i) => i%2 !== 0))    // q =exp(...) * x_{k+N/2}
+
+    let X = Array(N)
+
+    let halfN = Math.floor(N/2)
+
+    for(let k = 0; k < halfN; k++ ){
+        // p = X[k] // not needed
+        let Wk = math.exp( math.multiply(-2*math.PI, math.complex(0,1), k/N)) // q = exp(-2*j*k/N). Signal to colvute at freq k/N)
+        let WkEven = math.multiply(Wk, Even[k])
+        
+        X[k] = math.add( Odd[k], WkEven ) 
+        X[k+halfN] = math.subtract( Odd[k], WkEven )
+    } 
+    // calc freq component
+    return X
+
+}
+
+
+// Create each Xk as the sum of each xn at different exponents - This function is incredible slow
+// function FFT_Full(yval){
+//     let N = yval.length
+//     let n_range = create_range(0,N,1)
+//     let Xk = Array(N)
+//     for(let k = 0; k < N; k++){
+//         let Wk =  math.map(math.multiply(-2*math.PI, math.complex(0,1), k/N, n_range ), math.exp)
+//         let xn_wk = math.multiply(Wk, yval)
+//         Xk[k] = math.sum(xn_wk)
+//     }
+//     return Xk
+// }
+
+function runFFT(t,y,algorithm){
+
+    let N = y.size()[0]
+
+    let yarr = y.toArray()
+
+    let X; // declar output
+
+    if (algorithm =="Cooley_Turkey"){
+        if (! isPowerTwo(N)){
+            let padSize = nextPowerTwo(N)-N
+            let paddArray = Array(padSize).fill(0)
+            // yarr = yarr.concat(Array(padSize).fill(0)) 
+            yarr.splice(Math.floor(N/2-paddArray.length/2), 0, ...paddArray)
+        }
+        X = FFT_cooley_turkey(yarr)
+    }
+    else{
+
+        // X = FFT_Full(yarr)
+        X = math.fft(y).toArray()
+
+    }
+       
+    // let X = math.fft(yarr)
+    // let X = math.fft(y).toArray()
+    
+    let Fs = 1 / math.mean(math.diff(t)) // sample freq, simply 1/Tstep
+    // let Fs = Math.ceil(t.length-1)/(t.at(-1)-t[0]);
+
+
+    let freq = math.multiply( math.range(0, N/2,1), Fs / (N))
+    
+    return [freq, X]
+}
+
+//
+function nextPowerTwo(x){
+   return math.pow(2,Math.ceil(Math.log2(x)))
+}
+
+// Any multiple of two has a single 1 all right bits are trailing zeros.
+// by checking the x-1, it sets all the trailing bits to one, hence if any trailing bit is "on" then it cant be a power
+//   Example of why it works.  (4)- (4-1) = 0x100 & 0x011 = 0x000  where as 
+// 
+function isPowerTwo(x){
+    if (x==0) return false
+    return ( (x & (x-1)) == 0)
 }
